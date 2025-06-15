@@ -1,54 +1,32 @@
 const express = require('express');
 const app = express();
-const PORT = 3000;
 
-// Sample wine database
-const wines = [
-  { id: 1, name: 'Pinot Noir', region: 'Burgundy', stock: 12 },
-  { id: 2, name: 'Chardonnay', region: 'California', stock: 8 },
-  { id: 3, name: 'Cabernet Sauvignon', region: 'Bordeaux', stock: 15 }
-];
-
-// Middleware
+// 1. Add your middleware first (these are standard)
 app.use(express.json());
-app.use((req, res, next) => {
-  console.log(`${new Date().toLocaleString()} - ${req.method} ${req.url}`);
-  next();
-});
+app.use(express.urlencoded({ extended: true }));
 
-// Endpoints
-app.get('/api/wines', (req, res) => {
-  res.json({
-    success: true,
-    count: wines.length,
-    data: wines
+// 2. THIS IS THE SPECIAL PORT HANDLING CODE - COPY THIS WHOLE BLOCK
+const startPort = 3000;
+
+function startServer(port) {
+  const server = app.listen(port, '127.0.0.1', () => {
+    console.log(`✅ Server is running on: http://localhost:${port}`);
   });
-});
+  
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`⚠️ Port ${port} is busy, trying ${port + 1} instead...`);
+      startServer(port + 1); // Try next port
+    } else {
+      console.error('🔥 Server error:', err.message);
+    }
+  });
+}
 
-app.get('/api/wines/:id', (req, res) => {
-  const wine = wines.find(w => w.id === parseInt(req.params.id));
-  if (!wine) return res.status(404).json({ success: false, message: 'Wine not found' });
-  res.json({ success: true, data: wine });
-});
-
-// Health check
+// 3. Add your routes AFTER the port code
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    endpoints: [
-      'GET /api/wines',
-      'GET /api/wines/:id',
-      'GET /api/health'
-    ]
-  });
+  res.json({ status: 'healthy', port: server.address().port });
 });
 
-// Start server
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`🍷 Wine API running on http://localhost:${PORT}`);
-  console.log('Available endpoints:');
-  console.log(`- GET /api/wines`);
-  console.log(`- GET /api/wines/:id`);
-  console.log(`- GET /api/health`);
-});
+// 4. Start the server with this line
+startServer(startPort);
