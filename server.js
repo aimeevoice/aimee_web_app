@@ -1,32 +1,52 @@
 const express = require('express');
 const app = express();
+const PORT = 3000;
 
-// 1. Add your middleware first (these are standard)
+// Essential middleware
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// 2. THIS IS THE SPECIAL PORT HANDLING CODE - COPY THIS WHOLE BLOCK
-const startPort = 3000;
-
+// 1. PORT HANDLER WITH AUTO-RETRY (keep this exactly as-is)
 function startServer(port) {
   const server = app.listen(port, '127.0.0.1', () => {
-    console.log(`✅ Server is running on: http://localhost:${port}`);
-  });
-  
-  server.on('error', (err) => {
+    console.log(`🚀 Server running on http://localhost:${port}`);
+  }).on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.log(`⚠️ Port ${port} is busy, trying ${port + 1} instead...`);
-      startServer(port + 1); // Try next port
+      console.log(`Port ${port} busy, trying ${port + 1}...`);
+      startServer(port + 1);
     } else {
-      console.error('🔥 Server error:', err.message);
+      console.error('Server error:', err);
     }
   });
 }
 
-// 3. Add your routes AFTER the port code
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'healthy', port: server.address().port });
+// 2. REQUIRED ROUTES (add your endpoints here)
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Welcome to the API',
+    endpoints: [
+      '/api/health',
+      '/api/wines'
+    ]
+  });
 });
 
-// 4. Start the server with this line
-startServer(startPort);
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'healthy', timestamp: new Date() });
+});
+
+// 3. SAMPLE DATA ENDPOINT
+const wines = [
+  { id: 1, name: 'Chardonnay', region: 'France' },
+  { id: 2, name: 'Merlot', region: 'Italy' }
+];
+
+app.get('/api/wines', (req, res) => {
+  res.json({
+    success: true,
+    count: wines.length,
+    data: wines
+  });
+});
+
+// 4. START THE SERVER (this must be LAST)
+startServer(PORT);
