@@ -74,33 +74,6 @@ app.post('/api/auth/login', (req, res) => {
   }
 });
 
-// Enhanced text processing for V3 emotional tags
-function enhanceTextForV3(text, queryType) {
-  let enhancedText = text;
-  
-  if (queryType === 'email') {
-    enhancedText = `(friendly) ${text}`;
-  } else if (text.includes('stock') || text.includes('inventory')) {
-    if (text.includes('0 bottles') || text.includes('out of stock')) {
-      enhancedText = `(apologetic) ${text}`;
-    } else {
-      enhancedText = `(informative) ${text}`;
-    }
-  } else if (text.includes('price') || text.includes('cost')) {
-    enhancedText = `(professional) ${text}`;
-  } else if (text.includes('sorry') || text.includes('error') || text.includes('not found')) {
-    enhancedText = `(apologetic) ${text}`;
-  } else if (text.includes('excellent') || text.includes('great') || text.includes('perfect') || text.includes('success')) {
-    enhancedText = `(enthusiastic) ${text}`;
-  } else if (text.includes('order') || text.includes('customer')) {
-    enhancedText = `(helpful) ${text}`;
-  } else {
-    enhancedText = `(warm) ${text}`;
-  }
-  
-  return enhancedText;
-}
-
 // Smart query processing function
 function processVoiceQuery(query) {
   const lowerQuery = query.toLowerCase();
@@ -227,13 +200,12 @@ function processVoiceQuery(query) {
   };
 }
 
-// Enhanced TTS generation with V3 support and fallback
+// TTS generation with V2 Multilingual (FORCED)
 async function generateSpeech(text, queryType, apiKey, voiceId, isIOS = false) {
   if (!apiKey || isIOS) {
     return null;
   }
   
-  const useV3 = process.env.USE_ELEVEN_V3 === 'true';
   const cleanVoiceId = (voiceId || '').trim();
   
   if (!cleanVoiceId) {
@@ -241,32 +213,16 @@ async function generateSpeech(text, queryType, apiKey, voiceId, isIOS = false) {
     return null;
   }
   
-  // Determine model and settings
-  let modelId, enhancedText, voiceSettings;
+  // FORCE V2 MULTILINGUAL MODEL
+  const modelId = 'eleven_multilingual_v2';
+  const voiceSettings = {
+    stability: 0.5,
+    similarity_boost: 0.5
+  };
   
-  if (useV3) {
-    modelId = 'eleven_v3';
-    enhancedText = enhanceTextForV3(text, queryType);
-    voiceSettings = {
-      stability: 0.3,
-      similarity_boost: 0.8,
-      style: 0.2,
-      use_speaker_boost: true
-    };
-    console.log(`🎭 Using Eleven V3 with enhanced text: "${enhancedText}"`);
-  } else {
-    modelId = 'eleven_flash_v2_5';
-    enhancedText = text;
-    voiceSettings = {
-      stability: 0.5,
-      similarity_boost: 0.5
-    };
-    console.log(`⚡ Using Flash V2.5 for real-time response`);
-  }
+  console.log(`🎙️ Using V2 Multilingual with voice ID: ${cleanVoiceId}`);
   
   try {
-    console.log(`🎙️ Generating speech with voice ID: ${cleanVoiceId}`);
-    
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${cleanVoiceId}`, {
       method: 'POST',
       headers: {
@@ -275,7 +231,7 @@ async function generateSpeech(text, queryType, apiKey, voiceId, isIOS = false) {
         'xi-api-key': apiKey
       },
       body: JSON.stringify({
-        text: enhancedText,
+        text: text,
         model_id: modelId,
         voice_settings: voiceSettings
       })
@@ -289,70 +245,20 @@ async function generateSpeech(text, queryType, apiKey, voiceId, isIOS = false) {
     } else {
       const errorText = await response.text();
       console.log(`❌ TTS generation failed: ${response.status} - ${errorText}`);
-      
-      // Fallback: If V3 fails, try Flash V2.5
-      if (useV3 && (response.status === 400 || response.status === 422)) {
-        console.log('🔄 V3 failed, falling back to Flash V2.5...');
-        return await generateSpeechFallback(text, apiKey, cleanVoiceId);
-      }
-      
       return null;
     }
   } catch (error) {
     console.error('TTS generation error:', error.message);
-    
-    if (useV3) {
-      console.log('🔄 Network error with V3, trying Flash V2.5 fallback...');
-      return await generateSpeechFallback(text, apiKey, cleanVoiceId);
-    }
-    
     return null;
   }
 }
 
-// Fallback TTS generation
-async function generateSpeechFallback(text, apiKey, voiceId) {
-  try {
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': apiKey
-      },
-      body: JSON.stringify({
-        text: text,
-        model_id: 'eleven_flash_v2_5',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.5
-        }
-      })
-    });
-
-    if (response.ok) {
-      const audioBuffer = await response.arrayBuffer();
-      const base64Audio = Buffer.from(audioBuffer).toString('base64');
-      console.log('✅ Fallback TTS successful with Flash V2.5');
-      return `data:audio/mpeg;base64,${base64Audio}`;
-    } else {
-      console.log(`❌ Fallback TTS also failed: ${response.status}`);
-      return null;
-    }
-  } catch (error) {
-    console.error('Fallback TTS error:', error.message);
-    return null;
-  }
-}
-
-// 🔍 VOICE INSPECTOR ENDPOINT - THIS WILL FIX YOUR VOICE ISSUE
+// 🔍 VOICE INSPECTOR ENDPOINT
 app.get('/api/voice-inspector', async (req, res) => {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   const voiceId = process.env.VOICE_ID;
   
   console.log('🔍 Voice Inspector called');
-  console.log(`Current Voice ID: "${voiceId}"`);
-  console.log(`API Key present: ${!!apiKey}`);
   
   if (!apiKey) {
     return res.json({ 
@@ -362,7 +268,6 @@ app.get('/api/voice-inspector', async (req, res) => {
   }
   
   try {
-    // Get all voices from ElevenLabs
     const voicesResponse = await fetch('https://api.elevenlabs.io/v1/voices', {
       headers: { 
         'xi-api-key': apiKey,
@@ -371,133 +276,52 @@ app.get('/api/voice-inspector', async (req, res) => {
     });
     
     if (!voicesResponse.ok) {
-      const errorText = await voicesResponse.text();
       return res.json({
         error: `ElevenLabs API failed: ${voicesResponse.status}`,
-        details: errorText,
-        fix: 'Check your ELEVENLABS_API_KEY - it might be invalid'
+        fix: 'Check your ELEVENLABS_API_KEY'
       });
     }
     
     const voicesData = await voicesResponse.json();
-    console.log(`✅ Found ${voicesData.voices.length} total voices`);
     
     // Check if current voice ID exists
     const currentVoiceExists = voicesData.voices.find(v => v.voice_id === voiceId);
     
-    // Find custom voices (your created voices)
+    // Find your custom voices
     const customVoices = voicesData.voices.filter(v => 
       v.category === 'cloned' || v.category === 'generated'
     );
     
-    // Look for Aimee voice specifically
+    // Look for Aimee voices
     const aimeeVoices = voicesData.voices.filter(v => 
       v.name.toLowerCase().includes('aimee') || 
       v.name.toLowerCase().includes('amy')
     );
     
-    // Good default female voices as backup
-    const goodFemaleVoices = voicesData.voices.filter(v => 
+    // Backup female voices
+    const backupVoices = voicesData.voices.filter(v => 
       v.category === 'premade' && (
         v.name.toLowerCase().includes('rachel') ||
-        v.name.toLowerCase().includes('bella') ||
-        v.name.toLowerCase().includes('dorothy')
+        v.name.toLowerCase().includes('bella')
       )
     );
     
-    // Create response with fixes
-    const response = {
-      timestamp: new Date().toISOString(),
+    res.json({
+      model: 'eleven_multilingual_v2',
       status: currentVoiceExists ? 'VOICE_FOUND' : 'VOICE_NOT_FOUND',
-      
       current: {
         voiceId: voiceId,
-        voiceIdLength: voiceId?.length || 0,
         found: !!currentVoiceExists,
-        name: currentVoiceExists?.name || 'NOT FOUND',
-        category: currentVoiceExists?.category || 'N/A'
+        name: currentVoiceExists?.name || 'NOT FOUND'
       },
-      
-      analysis: {
-        totalVoices: voicesData.voices.length,
-        customVoices: customVoices.length,
-        aimeeVoices: aimeeVoices.length
-      },
-      
-      yourCustomVoices: customVoices.map(v => ({
-        name: v.name,
-        id: v.voice_id,
-        category: v.category
-      })),
-      
-      aimeeVoices: aimeeVoices.map(v => ({
-        name: v.name,
-        id: v.voice_id,
-        category: v.category
-      })),
-      
-      backupVoices: goodFemaleVoices.map(v => ({
-        name: v.name,
-        id: v.voice_id,
-        description: 'Good female voice as backup'
-      })),
-      
-      // Immediate fixes
-      fixes: []
-    };
-    
-    // Generate specific fixes based on what we found
-    if (!currentVoiceExists) {
-      response.fixes.push({
-        issue: 'Current voice ID not found',
-        severity: 'HIGH',
-        solution: voiceId ? `Voice ID "${voiceId}" doesn't exist in your account` : 'No voice ID configured'
-      });
-      
-      if (aimeeVoices.length > 0) {
-        response.fixes.push({
-          issue: 'Found Aimee voice(s)',
-          severity: 'FIX',
-          solution: `Use this voice ID: ${aimeeVoices[0].voice_id}`,
-          railwayCommand: `VOICE_ID=${aimeeVoices[0].voice_id}`
-        });
-      } else if (customVoices.length > 0) {
-        response.fixes.push({
-          issue: 'No Aimee voice, but found custom voices',
-          severity: 'OPTION',
-          solution: `Try one of your custom voices: ${customVoices[0].voice_id}`,
-          railwayCommand: `VOICE_ID=${customVoices[0].voice_id}`
-        });
-      } else {
-        response.fixes.push({
-          issue: 'No custom voices found',
-          severity: 'BACKUP',
-          solution: `Use Rachel as backup: ${goodFemaleVoices[0]?.voice_id || '21m00Tcm4TlvDq8ikWAM'}`,
-          railwayCommand: `VOICE_ID=${goodFemaleVoices[0]?.voice_id || '21m00Tcm4TlvDq8ikWAM'}`
-        });
-      }
-    } else {
-      response.fixes.push({
-        issue: 'Voice ID is correct',
-        severity: 'OK',
-        solution: 'Voice ID exists and should work. Check API key or network issues.'
-      });
-    }
-    
-    console.log(`🎯 Voice Inspector Result: ${response.status}`);
-    if (aimeeVoices.length > 0) {
-      console.log(`🎉 Found Aimee voice: ${aimeeVoices[0].name} - ${aimeeVoices[0].voice_id}`);
-    }
-    
-    res.json(response);
+      yourCustomVoices: customVoices.map(v => ({ name: v.name, id: v.voice_id })),
+      aimeeVoices: aimeeVoices.map(v => ({ name: v.name, id: v.voice_id })),
+      backupVoices: backupVoices.map(v => ({ name: v.name, id: v.voice_id })),
+      quickFix: backupVoices[0] ? `Set VOICE_ID=${backupVoices[0].voice_id} for immediate fix` : null
+    });
     
   } catch (error) {
-    console.error('Voice Inspector Error:', error);
-    res.json({
-      error: 'Inspector failed',
-      details: error.message,
-      fix: 'Check network connection and API key'
-    });
+    res.json({ error: error.message });
   }
 });
 
@@ -514,7 +338,7 @@ app.post('/api/voice-query', authenticateToken, async (req, res) => {
   const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
   const VOICE_ID = process.env.VOICE_ID;
 
-  // Generate audio
+  // Generate audio with V2 Multilingual
   let audioUrl = null;
   if (ELEVENLABS_API_KEY && !isIOS) {
     audioUrl = await generateSpeech(result.response, result.type, ELEVENLABS_API_KEY, VOICE_ID, isIOS);
@@ -557,21 +381,20 @@ app.post('/api/send-email', authenticateToken, async (req, res) => {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  const useV3 = process.env.USE_ELEVEN_V3 === 'true';
   const hasApiKey = !!process.env.ELEVENLABS_API_KEY;
   const hasVoiceId = !!process.env.VOICE_ID;
   
   res.json({ 
     status: 'online', 
     message: 'Aimee Wine Sales Assistant API is running',
-    model: useV3 ? 'Eleven V3 (alpha) - Expressive' : 'Flash V2.5 - Real-time',
+    model: 'V2 Multilingual (Forced)',
     inventory: `${wineInventory.length} wines available`,
     customers: `${customers.length} customers in database`,
     recentOrders: `${recentOrders.length} recent orders`,
     configuration: {
       hasApiKey,
       hasVoiceId,
-      v3Enabled: useV3
+      model: 'eleven_multilingual_v2'
     },
     endpoints: [
       'POST /api/voice-query - Main voice processing',
@@ -594,12 +417,11 @@ app.get('/api/customers', authenticateToken, (req, res) => {
 
 // Start the server
 app.listen(PORT, () => {
-  const useV3 = process.env.USE_ELEVEN_V3 === 'true';
   console.log(`🍷 Aimee Wine Assistant API running on port ${PORT}`);
   console.log(`📊 Loaded ${wineInventory.length} wines and ${customers.length} customers`);
   console.log(`🔑 JWT Secret: ${JWT_SECRET ? 'Configured' : 'Missing'}`);
   console.log(`🎙️ ElevenLabs API: ${process.env.ELEVENLABS_API_KEY ? 'Configured' : 'Missing'}`);
-  console.log(`🎭 Voice Model: ${useV3 ? 'Eleven V3 (alpha)' : 'Flash V2.5'}`);
+  console.log(`🎭 Voice Model: V2 Multilingual (FORCED)`);
   console.log(`🎯 Voice ID: ${process.env.VOICE_ID || 'Not set'}`);
   console.log(`🔍 Voice Inspector: https://your-app.railway.app/api/voice-inspector`);
 });
