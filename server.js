@@ -4,23 +4,30 @@ const fetch = require('node-fetch');
 const jwt = require('jsonwebtoken');
 
 const app = express();
-const PORT = process.env.PORT || 8088; // Updated to match Railway
+const PORT = process.env.PORT || 8088;
 
-// Enhanced CORS configuration
+// 1. Enhanced CORS configuration
 app.use(cors({
   origin: ['https://aimee-production.up.railway.app', 'http://localhost:3000'],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// 2. Body parser middleware
 app.use(express.json());
+
+// 3. Request logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
 
 // JWT Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-minimum-32-characters-long';
 
 // [Keep all your existing database arrays...]
 
-// Add root endpoint
+// 4. Root endpoint - should work
 app.get('/', (req, res) => {
   res.json({
     message: 'Aimee Wine Inventory API is running!',
@@ -29,9 +36,18 @@ app.get('/', (req, res) => {
   });
 });
 
-// [Keep all your existing middleware and functions...]
+// 5. Health check endpoint - fixed version
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    nodeVersion: process.version,
+    memoryUsage: process.memoryUsage(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
-// Enhanced voice inspector endpoint
+// 6. Voice inspector endpoint - fixed version
 app.get('/api/voice-inspector', async (req, res) => {
   try {
     const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -62,7 +78,23 @@ app.get('/api/voice-inspector', async (req, res) => {
     
     const voicesData = await voicesResponse.json();
     
-    // [Rest of your existing voice inspector logic...]
+    // Check if current voice ID exists
+    const currentVoiceExists = voicesData.voices.find(v => v.voice_id === voiceId);
+    
+    res.json({
+      status: 'success',
+      model: 'eleven_multilingual_v2',
+      currentVoice: {
+        id: voiceId,
+        exists: !!currentVoiceExists,
+        name: currentVoiceExists?.name || 'Not found'
+      },
+      availableVoices: voicesData.voices.map(v => ({
+        id: v.voice_id,
+        name: v.name,
+        category: v.category
+      }))
+    });
     
   } catch (error) {
     console.error('Voice inspector error:', error);
@@ -75,23 +107,37 @@ app.get('/api/voice-inspector', async (req, res) => {
 
 // [Keep all your other existing endpoints...]
 
-// Enhanced server startup
+// 7. 404 handler for undefined routes
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Endpoint not found',
+    requestedMethod: req.method,
+    requestedPath: req.path,
+    availableEndpoints: [
+      'GET /',
+      'GET /api/health',
+      'GET /api/voice-inspector',
+      'POST /api/auth/login'
+    ]
+  });
+});
+
+// 8. Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: err.message
+  });
+});
+
+// 9. Enhanced server startup
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🍷 Aimee Wine Assistant API running on port ${PORT}`);
-  console.log(`📊 Loaded ${wineInventory.length} wines and ${customers.length} customers`);
-  console.log(`🔑 JWT Secret: ${JWT_SECRET ? 'Configured' : 'Missing'}`);
-  console.log(`🎙️ ElevenLabs API: ${process.env.ELEVENLABS_API_KEY ? 'Configured' : 'Missing'}`);
-  console.log(`🎭 Voice Model: V2 Multilingual (FORCED)`);
-  console.log(`🎯 Voice ID: ${process.env.VOICE_ID || 'Not set'}`);
-  console.log(`🔍 Voice Inspector: https://${process.env.RAILWAY_PUBLIC_DOMAIN || 'localhost:' + PORT}/api/voice-inspector`);
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err);
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
+  console.log(`Server running on port ${PORT}`);
+  console.log('Available endpoints:');
+  console.log(`- GET /`);
+  console.log(`- GET /api/health`);
+  console.log(`- GET /api/voice-inspector`);
+  console.log(`- POST /api/auth/login`);
+  console.log(`(Plus your other endpoints...)`);
 });
