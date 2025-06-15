@@ -1,14 +1,32 @@
+require('dotenv').config();
 const express = require('express');
-const app = express();
-const PORT = 3000;
+const cors = require('cors');
+const fetch = require('node-fetch');
+const jwt = require('jsonwebtoken');
 
-// Essential middleware
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// 1. Middleware Setup
+app.use(cors({
+  origin: [
+    'http://localhost:5173', 
+    'https://your-netlify-app.netlify.app',
+    'https://your-railway.app'
+  ]
+}));
 app.use(express.json());
 
-// 1. PORT HANDLER WITH AUTO-RETRY (keep this exactly as-is)
+// 2. Auto-port Handling (Improved)
 function startServer(port) {
-  const server = app.listen(port, '127.0.0.1', () => {
-    console.log(`🚀 Server running on http://localhost:${port}`);
+  const server = app.listen(port, '0.0.0.0', () => {
+    console.log(`
+    🚀 Aimee Assistant Running
+    --------------------------
+    Local: http://localhost:${port}
+    ElevenLabs: ${process.env.ELEVENLABS_API_KEY ? '✅ Configured' : '❌ Missing'}
+    Voice ID: ${process.env.VOICE_ID || 'Not set'}
+    `);
   }).on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.log(`Port ${port} busy, trying ${port + 1}...`);
@@ -19,34 +37,40 @@ function startServer(port) {
   });
 }
 
-// 2. REQUIRED ROUTES (add your endpoints here)
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Welcome to the API',
-    endpoints: [
-      '/api/health',
-      '/api/wines'
-    ]
-  });
+// 3. RESTORE YOUR ORIGINAL ROUTES
+// ==============================
+
+// Authentication
+app.post('/api/auth/login', (req, res) => {
+  // Your existing login logic
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'healthy', timestamp: new Date() });
+// Voice Processing
+app.post('/api/voice-query', async (req, res) => {
+  // Your ElevenLabs/Whisper integration
+  try {
+    const response = await fetch('https://api.elevenlabs.io/v1/...', {
+      headers: {
+        'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json'
+      }
+    });
+    // Your voice processing logic
+  } catch (error) {
+    console.error('Voice API error:', error);
+  }
 });
 
-// 3. SAMPLE DATA ENDPOINT
-const wines = [
-  { id: 1, name: 'Chardonnay', region: 'France' },
-  { id: 2, name: 'Merlot', region: 'Italy' }
-];
-
-app.get('/api/wines', (req, res) => {
+// 4. Frontend Connection Routes
+app.get('/api/config', (req, res) => {
   res.json({
-    success: true,
-    count: wines.length,
-    data: wines
+    services: {
+      elevenlabs: !!process.env.ELEVENLABS_API_KEY,
+      voiceId: !!process.env.VOICE_ID,
+      backend: 'active'
+    }
   });
 });
 
-// 4. START THE SERVER (this must be LAST)
+// 5. Start Server (LAST LINE)
 startServer(PORT);
