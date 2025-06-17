@@ -62,6 +62,20 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Helper function to format prices naturally for speech
+function formatPriceForSpeech(price) {
+  const priceStr = price.toString();
+  const [dollars, cents] = priceStr.split('.');
+  
+  if (!cents || cents === '00') {
+    return `${dollars}`;
+  } else if (cents.length === 1) {
+    return `${dollars} ${cents}0`; // e.g., 12.5 becomes "$12 50"
+  } else {
+    return `${dollars} ${cents}`; // e.g., 12.99 becomes "$12 99"
+  }
+}
+
 // Authentication endpoints
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
@@ -78,9 +92,10 @@ app.post('/api/auth/login', (req, res) => {
 function processVoiceQuery(query) {
   const lowerQuery = query.toLowerCase();
 
-if (lowerQuery.includes('confirm email') || lowerQuery.includes('email ready')) {
+  // FIXED: Email confirmation with proper response type
+  if (lowerQuery.includes('confirm email') || lowerQuery.includes('email ready')) {
     return {
-      type: 'email_confirm',
+      type: 'general',
       response: `I've prepared your email. Please review the message and say 'send email' to send it, or 'cancel' to cancel.`
     };
   }
@@ -155,14 +170,16 @@ if (lowerQuery.includes('confirm email') || lowerQuery.includes('email ready')) 
     );
     
     if (wineMatch) {
+      const formattedPrice = formatPriceForSpeech(wineMatch.price);
       return {
         type: 'pricing',
-        response: `The ${wineMatch.name} (${wineMatch.vintage}) from ${wineMatch.region} is priced at $${wineMatch.price} per bottle.`
+        response: `The ${wineMatch.name} (${wineMatch.vintage}) from ${wineMatch.region} is priced at ${formattedPrice} per bottle.`
       };
     } else if (lowerQuery.includes('all') || lowerQuery.includes('everything')) {
-      const priceList = wineInventory.map(wine => 
-        `${wine.name} (${wine.vintage}): $${wine.price}`
-      ).join(', ');
+      const priceList = wineInventory.map(wine => {
+        const formattedPrice = formatPriceForSpeech(wine.price);
+        return `${wine.name} (${wine.vintage}): ${formattedPrice}`;
+      }).join(', ');
       return {
         type: 'pricing',
         response: `Here's our complete price list: ${priceList}.`
@@ -170,12 +187,19 @@ if (lowerQuery.includes('confirm email') || lowerQuery.includes('email ready')) 
     }
   }
   
-  // Customer queries
+  // FIXED: Customer queries with natural date formatting
   if (lowerQuery.includes('customer') || lowerQuery.includes('bought') || lowerQuery.includes('ordered') || lowerQuery.includes('who')) {
     if (lowerQuery.includes('week') || lowerQuery.includes('recent')) {
-      const recentCustomers = recentOrders.map(order => 
-        `${order.customerName} ordered ${order.quantity} bottles of ${order.wineName} on ${order.date}`
-      ).join(', ');
+      const recentCustomers = recentOrders.map(order => {
+        // Convert date to natural format
+        const date = new Date(order.date);
+        const naturalDate = date.toLocaleDateString('en-US', { 
+          month: 'long', 
+          day: 'numeric' 
+        });
+        return `${order.customerName} ordered ${order.quantity} bottles of ${order.wineName} on ${naturalDate}`;
+      }).join('. ');
+      
       return {
         type: 'customers',
         response: `Recent customer orders: ${recentCustomers}.`
