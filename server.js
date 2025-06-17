@@ -350,6 +350,6 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🍷 Aimee Wine Assistant API running on port ${PORT}`);
   console.log(`🔑 JWT Secret: ${JWT_SECRET ? 'Configured' : 'Missing'}`);
-  console.log(`🎙️ ElevenLabs Voice: rzsnuMd2pwYz1rGtMIVI (HARDCODED)`);
+  console.log(`🎙️ ElevenLabs Voice: 54Cze5LrTSyLgbO6Fhlc (HARDCODED)`);
   console.log(`🚀 Ready for voice queries at /api/voice-query`);
 });
