@@ -77,6 +77,13 @@ app.post('/api/auth/login', (req, res) => {
 // Smart query processing function
 function processVoiceQuery(query) {
   const lowerQuery = query.toLowerCase();
+
+if (lowerQuery.includes('confirm email') || lowerQuery.includes('email ready')) {
+    return {
+      type: 'email_confirm',
+      response: `I've prepared your email. Please review the message and say 'send email' to send it, or 'cancel' to cancel.`
+    };
+  }
   
   // Email detection and processing
   if (lowerQuery.includes('email') || lowerQuery.includes('send') || lowerQuery.includes('contact')) {
