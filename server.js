@@ -101,7 +101,26 @@ function processVoiceQuery(query) {
   }
   
   // Email detection and processing
+  // Email detection and processing - Check for specific customers FIRST
   if (lowerQuery.includes('email') || lowerQuery.includes('send') || lowerQuery.includes('contact')) {
+    // Check for specific restaurant/customer FIRST
+    let recipient = '';
+    let customerName = '';
+    
+    if (lowerQuery.includes('thompson')) {
+      recipient = 'sarah@thompsonrestaurant.com';
+      customerName = 'Thompson Restaurant';
+    } else if (lowerQuery.includes('johnson')) {
+      recipient = 'mike@johnsonwinery.com';
+      customerName = 'Johnson Winery';
+    } else if (lowerQuery.includes('bella vista')) {
+      recipient = 'orders@bellavistabistro.com';
+      customerName = 'Bella Vista Bistro';
+    }
+    
+    // If we found a specific customer, process the email
+    if (recipient && customerName) {
+      
     const customerMatch = customers.find(c => 
       lowerQuery.includes(c.name.toLowerCase()) || 
       lowerQuery.includes(c.name.split(' ')[0].toLowerCase()) ||
