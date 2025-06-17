@@ -9,6 +9,21 @@ const PORT = process.env.PORT || 8080;
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req, res) => {
+  res.json({ message: 'Aimee server is running!' });
+});
+
+app.get('/test', (req, res) => {
+  res.json({ message: 'Test route working!' });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'online',
+    message: 'Health check working'
+  });
+});
+
 // JWT Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-minimum-32-characters-long';
 
@@ -336,20 +351,30 @@ app.post('/api/send-email', authenticateToken, async (req, res) => {
   });
 });
 
-// Health check endpoint
+// Health check endpoint - MAKE SURE THIS EXISTS
 app.get('/api/health', (req, res) => {
+  const hasApiKey = !!process.env.ELEVENLABS_API_KEY;
+  const hasVoiceId = !!process.env.VOICE_ID;
+  
   res.json({ 
     status: 'online', 
     message: 'Aimee Wine Sales Assistant API is running',
-    voice: 'rzsnuMd2pwYz1rGtMIVI (hardcoded)',
-    model: 'eleven_multilingual_v2'
+    model: 'V2 Multilingual (Forced)',
+    inventory: `${wineInventory.length} wines available`,
+    customers: `${customers.length} customers in database`,
+    recentOrders: `${recentOrders.length} recent orders`,
+    configuration: {
+      hasApiKey,
+      hasVoiceId,
+      model: 'eleven_multilingual_v2'
+    }
   });
 });
 
-// Start the server
+// Start the server - MAKE SURE THIS IS AT THE VERY END
 app.listen(PORT, () => {
   console.log(`🍷 Aimee Wine Assistant API running on port ${PORT}`);
-  console.log(`🔑 JWT Secret: ${JWT_SECRET ? 'Configured' : 'Missing'}`);
-  console.log(`🎙️ ElevenLabs Voice: 54Cze5LrTSyLgbO6Fhlc (HARDCODED)`);
-  console.log(`🚀 Ready for voice queries at /api/voice-query`);
+  console.log(`🎙️ ElevenLabs API: ${process.env.ELEVENLABS_API_KEY ? 'Configured' : 'Missing'}`);
+  console.log(`🎭 Voice Model: V2 Multilingual (Forced)`);
+  console.log(`🎯 Voice ID: ${process.env.VOICE_ID || 'Not set'}`);
 });
