@@ -176,6 +176,14 @@ function processVoiceQuery(query) {
     };
   }
 
+  // Add demo email success response
+  if (lowerQuery.includes('email sent successfully demo') || (lowerQuery.includes('email sent') && lowerQuery.includes('demo'))) {
+    return {
+      type: 'general',
+      response: 'Email sent successfully! This was a demonstration of the email feature.'
+    };
+  }
+
   // Email detection and processing - Check for specific customers FIRST
   if (lowerQuery.includes('email') || lowerQuery.includes('send') || lowerQuery.includes('contact')) {
     // Check for specific restaurant/customer FIRST
@@ -467,7 +475,7 @@ app.post('/api/voice-query', authenticateToken, async (req, res) => {
   }
 });
 
-// Email sending endpoint
+// Email sending endpoint (DEMO - simulates email sending)
 app.post('/api/send-email', authenticateToken, async (req, res) => {
   try {
     const { to, content } = req.body;
@@ -476,25 +484,24 @@ app.post('/api/send-email', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Recipient and content are required' });
     }
 
-    console.log(`📧 Sending email to: ${to}`);
-    console.log(`📄 Content: ${content.substring(0, 100)}...`);
+    console.log(`📧 DEMO: Simulating email send to: ${to}`);
+    console.log(`📄 DEMO: Content preview: ${content.substring(0, 100)}...`);
     
-    // In a real implementation, you would integrate with an email service like SendGrid, Mailgun, etc.
-    // For demo purposes, we'll simulate sending
-    
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate email sending delay
+    // Simulate email sending delay (no actual email sent)
+    await new Promise(resolve => setTimeout(resolve, 800));
     
     res.json({ 
       success: true, 
-      message: 'Email sent successfully',
+      message: 'Email sent successfully (demo)',
       recipient: to,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      demo: true  // Indicates this is a simulation
     });
 
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error in email demo:', error);
     res.status(500).json({ 
-      error: 'Failed to send email',
+      error: 'Failed to send email (demo)',
       details: error.message 
     });
   }
